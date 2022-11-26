@@ -186,7 +186,7 @@ def get_delta_LPCC(fr_lpcc, K = 3):
     return dlp * S
 
 
-#some normalization functions are here
+#some straigt forward normalization functions are here (when we dont have large data sets to normalize)
 def CMNorm(fr_lpcc):
     """Given the rows of cepstrum vector, compute the mean cepstrum vector and substract from each cepstrum
     """
@@ -211,3 +211,17 @@ def LPCCextraction(audio,sr,winlen=0.025,hoplen=0.01,Q=18,p=12,emph_coeff=0.95,N
         if NORM == 'CMVN':
             lpcc = CMVar_norm(lpcc)
     return lpcc
+
+#------------------------------------------------------------------------
+#Energy based end clipping of audio signals
+def end_voice_clipping_by_Eng(audio,factor=3):
+    std = factor * 10 * numpy.var(audio)
+    indices = numpy.where(audio > std)[0]
+    return indices[0], indices[-1] #start indices and end indices
+
+def end_voice_clipping_by_Thr(audio, thr=100):
+    indices = numpy.where(audio > thr)[0]
+    return indices[0], indices[-1]
+#one can also clip the features if there is a significant gap between the phrases or words, but allowing little bit of 
+# silence might help the modelling stuff (I think it will increase the robustness)
+#------------------------------------------------------------------------
