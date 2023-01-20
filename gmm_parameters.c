@@ -52,6 +52,16 @@ double **enMeanPrecProd   = NULL;//(double**) malloc(sizeof(double*) * nFeatures
 
 
 
+const int frTVCol = 150;
+const int enTVCol = 150;
+
+const char frTVMatFile[] = "frenchTVmat.bin";
+const char enTVMatFile[] = "englishTVmat.bin";
+
+double **frTVMat = NULL;
+double **enTVMat = NULL;
+
+
 
 void initEnglishGmmParameters(){
     FILE *fp;
@@ -116,7 +126,7 @@ void initEnglishGmmParameters(){
     fclose(fp);
 
     //for opening the logDeterminant file enlogdetFile
-    fp = fopen(fp = enlogdetFile,"r");
+    fp = fopen(enlogdetFile,"r");
     if (fp == NULL){
         fprintf(stderr, "%s can't open now, missing the respective file.\n", enlogdetFile);
         exit(1);
@@ -159,6 +169,7 @@ void initEnglishGmmParameters(){
             exit(1);
         }
     }
+    fprintf(stderr, "Succesfully read the %s file.\n",enmeanFile);
     fclose(fp);
 
     //for opening the covar file
@@ -184,6 +195,7 @@ void initEnglishGmmParameters(){
             exit(1);
         }
     }
+    fprintf(stderr, "Succesfully read the %s file.\n", encovarFile);
     fclose(fp);
 
     // for opening the prec file
@@ -209,6 +221,7 @@ void initEnglishGmmParameters(){
             exit(1);
         }
     }
+    fprintf(stderr, "Succefully read the %s file.\n",enprecFile);
     fclose(fp);
 
     // for opening the sqrt precision file
@@ -234,6 +247,7 @@ void initEnglishGmmParameters(){
             exit(1);
         }
     }
+    fprintf(stderr, "Succefully read the %s file.\n",ensqrtprecFile);
     fclose(fp);
 
 
@@ -260,6 +274,7 @@ void initEnglishGmmParameters(){
             exit(1);
         }
     }
+    fprintf(stderr,"Succefully read the %s file.\n", enmeanprecprodFile);
     fclose(fp);
 
 }
@@ -327,7 +342,7 @@ void initFrenchGmmParameters(){
     fclose(fp);
 
     //for opening the logDeterminant file frlogdetFile
-    fp = fopen(fp = frlogdetFile,"r");
+    fp = fopen(frlogdetFile,"r");
     if (fp == NULL){
         fprintf(stderr, "%s can't open now, missing the respective file.\n", frlogdetFile);
         exit(1);
@@ -370,6 +385,7 @@ void initFrenchGmmParameters(){
             exit(1);
         }
     }
+    fprintf(stderr, "Succefully read the %s file.\n",frmeanFile);
     fclose(fp);
 
     //for opening the covar file
@@ -395,6 +411,7 @@ void initFrenchGmmParameters(){
             exit(1);
         }
     }
+    fprintf(stderr, "Succefully read the %s file.\n", frcovarFile);
     fclose(fp);
 
     // for opening the prec file
@@ -420,6 +437,7 @@ void initFrenchGmmParameters(){
             exit(1);
         }
     }
+    fprintf(stderr, "Succefully read the %s file.\n", frprecFile);
     fclose(fp);
 
     // for opening the sqrt precision file
@@ -445,6 +463,7 @@ void initFrenchGmmParameters(){
             exit(1);
         }
     }
+    fprintf(stderr, "Succefully read the %s file.\n", frsqrtprecFile);
     fclose(fp);
 
 
@@ -471,12 +490,13 @@ void initFrenchGmmParameters(){
             exit(1);
         }
     }
+    fprintf(stderr, "Succefully read the %s file.\n", frmeanprecprodFile);
     fclose(fp);
 
 }
 void clearEnglishGmmParameters(){
     free(enGMMWeights);
-    free(enLogWeight);
+    free(enLogDet);
     free(enLogWeight);
     free(enMeanPrecProdSum);
 
@@ -502,7 +522,7 @@ void clearEnglishGmmParameters(){
 void clearFrenchGmmParameters(){
     free(frGMMWeights);
     free(frLogWeight);
-    free(frLogWeight);
+    free(frLogDet);
     free(frMeanPrecProdSum);
 
     for (int i = 0; i < frNC; i++){
@@ -520,5 +540,73 @@ void clearFrenchGmmParameters(){
     }
     free(frMeanPrecProd);
     fprintf(stderr, "Succesfully removed various french gmm parameters from the memory blocks.\n");
+}
+
+
+
+void initEnglishTVmatrix(){
+    FILE *fp;
+    fp = fopen(enTVMatFile,"r");
+    if (fp == NULL){
+        fprintf(stderr, "%s can't open now, missing the respective file.\n", enTVMatFile);
+        exit(1);
+    }
+    int count;
+    enTVMat = (double**) malloc(sizeof(double*) * nFeatures * enNC);
+    for (int i = 0; i < nFeatures * enNC; i++){
+        enTVMat[i] = (double*) malloc(sizeof(double) * enTVCol);
+        if (!enTVMat[i]){
+            fprintf(stderr, "could not create %d number of double type memory block.\n", enTVCol);
+            exit(1);
+        }
+        count = fread(enTVMat[i], sizeof(double), enTVCol, fp);
+        if (count != enTVCol){
+            fprintf(stderr, "could not read %d number of values at the index %d from the file %s.\n", enTVCol, i, enTVMatFile);
+            exit(1);
+        }
+    }
+    fprintf(stderr, "Succefully read the %s file.\n", enTVMatFile);
+    fclose(fp);
+}
+
+void clearEnglishTVmatrix(){
+    for (int i = 0; i < nFeatures * enNC; i++){
+        free(enTVMat[i]);
+    }
+    free(enTVMat);
+}
+
+
+void initFrenchTVmatrix(){
+    FILE *fp;
+    fp = fopen(frTVMatFile,"r");
+    if (fp == NULL){
+        fprintf(stderr, "%s can't open now, missing the respective file.\n", frTVMatFile);
+        exit(1);
+    }
+    int count;
+    frTVMat = (double**) malloc(sizeof(double*) * nFeatures * frNC);
+    for (int i = 0; i < nFeatures * frNC; i++){
+        frTVMat[i] = (double*) malloc(sizeof(double) * frTVCol);
+        if (!frTVMat[i]){
+            fprintf(stderr, "could not create %d number of double type memory block.\n", frTVCol);
+            exit(1);
+        }
+        count = fread(frTVMat[i], sizeof(double), frTVCol, fp);
+        if (count != frTVCol){
+            fprintf(stderr, "could not read %d number of values at the index %d from the file %s.\n", frTVCol, i, frTVMatFile);
+            exit(1);
+        }
+    }
+    fprintf(stderr, "Succefully read the %s file.\n", frTVMatFile);
+    fclose(fp);
+}
+
+
+void clearFrenchTVmatrix(){
+    for (int i = 0; i < nFeatures * frNC; i++){
+        free(frTVMat[i]);
+    }
+    free(frTVMat);
 }
 

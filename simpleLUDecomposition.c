@@ -1,11 +1,13 @@
-#include "matrixoperation.h"
 #include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
 
-void initSqMat(SqMat *sqMat){
-    if (sqMat->Row <= 0){
-        printf("Given square matrix is having null dimension.\n");
-        exit(1);
-    }
+typedef struct Mat{
+    int Row;
+    double **matrix;
+} Mat;
+
+void initMat(Mat *sqMat){
     double **p = (double**) malloc(sizeof(double*) * sqMat->Row);
     if (!p){
         printf("Could not allocate %d number of double* type memory blocks.\n", sqMat->Row);
@@ -28,18 +30,14 @@ void initSqMat(SqMat *sqMat){
     }
 }
 
-void clearSqMat(SqMat *sqMat){
+void clearMat(Mat *sqMat){
     for (int i = 0; i < sqMat->Row; i++){
         free(sqMat->matrix[i]);
     }
     free(sqMat->matrix);
 }
 
-void printMat(SqMat *sqMat){
-    if (sqMat->Row <= 0){
-        printf("Given square matrix is having null dimension.\n");
-        exit(1);
-    }
+void printMat(Mat *sqMat){
     printf("\n\n");
     for (int i = 0; i < sqMat->Row; i++){
         for (int j = 0; j < sqMat->Row; j++){
@@ -49,11 +47,7 @@ void printMat(SqMat *sqMat){
     }
 }
 
-void initIdentityMat(SqMat *Identity){
-    if (Identity->Row <= 0){
-        printf("Given square matrix is having null dimension.\n");
-        exit(1);
-    }
+void initIdentityMat(Mat *Identity){
     double **p = (double**) malloc(sizeof(double*) * Identity->Row);
     if (!p){
         printf("Could not allocate %d number of double* type memory blocks.\n", Identity->Row);
@@ -78,15 +72,11 @@ void initIdentityMat(SqMat *Identity){
 }
 
 
-void pivotSqMat(SqMat *sqMat, SqMat *zeros){
+void pivotSqMat(Mat *sqMat, Mat *zeros){
     int *p = (int*) malloc(sizeof(int) * sqMat->Row);
     if (!p){
         printf("Could not allocate %d number of int type memory blocks.\n", sqMat->Row);
         exit(1);
-    } else {
-        for (int i = 0; i < sqMat->Row; i++){
-            p[i] = 0;
-        }
     }
     double constant = 2.220446049250313e-15f;
     int maxId;
@@ -107,17 +97,15 @@ void pivotSqMat(SqMat *sqMat, SqMat *zeros){
                 maxId += 1;
             }
         }
-        //printf("(%d,%d)\t",r, maxId);
     }
     free(sqMat->matrix);
     sqMat->matrix = q;
     free(p);
-    //printMat(sqMat);
 }
 
 
-void computeLUdecomposition(SqMat *sqMat, SqMat *L, SqMat *U){
-    //printf("I am inside lu.\n");
+void computeLUdecomposition(Mat *sqMat, Mat *L, Mat *U){
+
     for (int i = 0; i < sqMat->Row; i++){
         for (int j = 0; j < sqMat->Row; j++){
             if (j >= i){
@@ -142,7 +130,7 @@ void computeLUdecomposition(SqMat *sqMat, SqMat *L, SqMat *U){
     }
 }
 
-void matMultiplication(SqMat *L, SqMat *U, SqMat *Res){
+void matMultiplication(Mat *L, Mat *U, Mat *Res){
     for (int i = 0; i < L->Row; i++){
         for (int j = 0; j < L->Row; j++){
             Res->matrix[i][j] = 0.0f;
@@ -153,7 +141,7 @@ void matMultiplication(SqMat *L, SqMat *U, SqMat *Res){
     }
 }
 
-void invUppMatrixLU(SqMat *U, SqMat *Identity){
+void invUppMatrixLU(Mat *U, Mat *Identity){
     double norm, scale;
     for (int i = U->Row - 1; i >= 0; i-- ){
         norm = U->matrix[i][i];
@@ -167,7 +155,7 @@ void invUppMatrixLU(SqMat *U, SqMat *Identity){
     }
 }
 
-void invLowMatrixLU(SqMat *L, SqMat *Identity){
+void invLowMatrixLU(Mat *L, Mat *Identity){
     double scale;
     for (int i = 0; i < L->Row; i++){
         for (int j = 0; j <= i; j++){
@@ -179,45 +167,32 @@ void invLowMatrixLU(SqMat *L, SqMat *Identity){
     }
 }
 
-
-void inverseMatrixLU(SqMat *mat, SqMat *Res){
-    SqMat La, Ua, ILa, IUa, Pa;
+void inverseMatrixLU(Mat *mat, Mat *Res){
+    Mat La, Ua, ILa, IUa, Pa;
     La.Row = mat->Row;
     Ua.Row = mat->Row;
     Pa.Row = mat->Row;
     IUa.Row = mat->Row;
     ILa.Row = mat->Row;
-    initSqMat(&La);
-    initSqMat(&Ua);
+    initMat(&La);
+    initMat(&Ua);
     initIdentityMat(&ILa);
     initIdentityMat(&IUa);
-    initSqMat(&Pa);
-    //printf("I am going to print the given matrix.\n");
-    //printMat(mat);
-
-    //printf("I am going to compute pivot matrix.\n");
+    initMat(&Pa);
     pivotSqMat(mat, &Pa);
-    //printf("I am going to print the given matrix.\n");
-    //printMat(mat);
-    //printf("I am going to compute lu decomposition.\n");
     computeLUdecomposition(mat, &La, &Ua);
-    //printf("I just computed LU decomposition matrices.\n");
-
-    //printf("goint to compute inverse upper matrix.\n");
     invUppMatrixLU(&Ua, &IUa);
-    //printf("going to compute inverse lower matrix.\n");
     invLowMatrixLU(&La, &ILa);
-
     matMultiplication(&IUa, &ILa, &La);
     matMultiplication(&La, &Pa, Res);
-    clearSqMat(&La);
-    clearSqMat(&Ua);
-    clearSqMat(&IUa);
-    clearSqMat(&ILa);
-    clearSqMat(&Pa);
+    clearMat(&La);
+    clearMat(&Ua);
+    clearMat(&IUa);
+    clearMat(&ILa);
+    clearMat(&Pa);
 }
 
-void copyMatrix(SqMat *Src, SqMat *Des){
+void copyMatrix(Mat *Src, Mat *Des){
     Des->Row = Src->Row;
     double **p = (double**) malloc(sizeof(double*) * Src->Row);
     if (!p){
@@ -241,4 +216,111 @@ void copyMatrix(SqMat *Src, SqMat *Des){
     }
 }
 
+int main(void){
+    int dim = 4;
+    Mat SqMat;
+    SqMat.Row = dim;
+    initMat(&SqMat);
+    //double Row1[] = {1.0f, 0.0f, 2.0f};
+    //double Row2[] = {2.0f, -1.0f, 3.0f};
+    //double Row3[] = {4.0f, 1.0f, 8.0f};
+    double Row1[] = {0.0f, 2.0f, 4.0f};
+    double Row2[] = {1.0f, 2.0f, 1.0f};
+    double Row3[] = {0.1f, 0.0f, 3.0f};
+    double row1[] = {11.0f,9.0f, 24.0f, 2.0f};
+    double row2[] = {1.0f,5.0f,2.0f,6.0f};
+    double row3[] = {3.0f,17.0f,18.0f,1.0f};
+    double row4[] = {2.0f,5.0f,7.0f,1.0f};
+    for (int i = 0; i < dim; i++){
+        SqMat.matrix[0][i] = row1[i];
+        SqMat.matrix[1][i] = row2[i];
+        SqMat.matrix[2][i] = row3[i];
+        SqMat.matrix[3][i] = row4[i];
+    }
+    printf("Original Matrix.\n");
+    printMat(&SqMat);
+    Mat L, U;
+    L.Row = dim;
+    U.Row = dim;
+    Mat pivotMatrix;
+    pivotMatrix.Row = dim;
+    initMat(&pivotMatrix);
+    pivotSqMat(&SqMat, &pivotMatrix);
+    printf("pivot matrix .\n");
+    printMat(&pivotMatrix);
+    printf(" and the respective shuffeled matrix is \n");
+    printMat(&SqMat);
 
+
+
+
+    initMat(&L);
+    initMat(&U);
+    computeLUdecomposition(&SqMat, &L, &U);
+    Mat Res;
+    Res.Row = dim;
+    initMat(&Res);
+    Mat IdentityU;
+    IdentityU.Row = dim;
+    Mat IdentityL;
+    IdentityL.Row = dim;
+    initIdentityMat(&IdentityL);
+    initIdentityMat(&IdentityU);
+
+
+    invUppMatrixLU(&U, &IdentityU);
+    invLowMatrixLU(&L, &IdentityL);
+    printf("U matrix.\n");
+    printMat(&U);
+    printf("Inverse of U matrix.\n");
+    printMat(&IdentityU);
+    matMultiplication(&U, &IdentityU, &Res);
+    printf("Result of U U-1.\n");
+    printMat(&Res);
+
+    printf("L matrix.\n");
+    printMat(&L);
+    printf("Inverse of L matrix.\n");
+    printMat(&IdentityL);
+    matMultiplication(&L, &IdentityL, &Res);
+    printf("Result of L L-1.\n");
+    printMat(&Res);
+
+
+
+    matMultiplication(&IdentityU, &IdentityL, &Res);
+    matMultiplication(&Res, &pivotMatrix, &L);
+    matMultiplication(&SqMat, &L, &Res);
+    printf("After finding inverse of a matrix using LU decomposition, we check that SqMat * inverse SqMat result as : \n");
+    printMat(&Res);
+
+    clearMat(&SqMat);
+    clearMat(&pivotMatrix);
+    clearMat(&L);
+    clearMat(&U);
+    clearMat(&Res);
+
+
+    Mat sqMat;
+    sqMat.Row = 3;
+    Mat res;
+    res.Row = 3;
+    initMat(&res);
+    initMat(&sqMat);
+    for (int i = 0; i < 3; i++){
+        sqMat.matrix[0][i] = Row1[i];
+        sqMat.matrix[1][i] = Row2[i];
+        sqMat.matrix[2][i] = Row3[i];
+    }
+    Mat cMat;
+    copyMatrix(&sqMat, &cMat);
+    printMat(&cMat);
+    inverseMatrixLU(&sqMat, &res);
+    printMat(&res);
+    matMultiplication(&res, &cMat, &sqMat);
+    printMat(&sqMat);
+    clearMat(&res);
+    clearMat(&sqMat);
+    clearMat(&cMat);
+    return 1;
+}

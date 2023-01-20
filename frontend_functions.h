@@ -11,6 +11,8 @@ void preEmphasis(RawAudio *rawAudio, double coeff);
 void findFrames(RawAudio *rawAudio, SignalFrames *framedSignal);
 void windowingFrames(SignalFrames *framedSignal);
 
+
+void rfft(double rbuf[], double ibuf[], double rout[], double iout[], int nFFT, int step);
 int CalculateNFFt(double sampleRate, double winLen);
 double Mel2Hz(double mel);
 double Hz2Mel(double hz);

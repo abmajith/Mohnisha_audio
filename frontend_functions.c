@@ -1,5 +1,6 @@
 #include "frontend_functions.h"
 #include <stdio.h>
+#include <time.h>
 
 //verified
 void padAudioSignal(RawAudio *rawAudio, int padLen){
@@ -36,6 +37,9 @@ void padFramedSignal(SignalFrames *framedSignal, int padLen){
 
 //verified
 void preEmphasis(RawAudio *rawAudio, double coeff){
+    clock_t start, end;
+    double execution_time;
+    start = clock();
     double lastValue = rawAudio->audio[0];
     double nextLastValue;
     for (int i = 1; i < rawAudio->len; i++){
@@ -43,11 +47,16 @@ void preEmphasis(RawAudio *rawAudio, double coeff){
         rawAudio->audio[i] -= coeff * lastValue;
         lastValue = nextLastValue;
     }
+    end = clock();
+    execution_time = ((double)(end - start))/CLOCKS_PER_SEC;
+    printf("It tooks around %lf time to do preemphasis.\n",execution_time);
 }
 
 //verified
 void findFrames(RawAudio *rawAudio, SignalFrames *framedSignal){
-    
+    clock_t start, end;
+    double execution_time;
+    start = clock();   
     int frameLength = framedSignal->frameLength;
     int nextFrameIndex = framedSignal->nextFrameIndex;
     int numberOfFrame = framedSignal->numberOfFrames;
@@ -57,10 +66,16 @@ void findFrames(RawAudio *rawAudio, SignalFrames *framedSignal){
             framedSignal->frames[n_f][k] = rawAudio->audio[k + (n_f * nextFrameIndex)];
         }
     }
+    end = clock();
+    execution_time = ((double)(end - start))/CLOCKS_PER_SEC;
+    printf("It tooks around %lf time to find Frames.\n",execution_time);
 }
 
 //verified
 void windowingFrames(SignalFrames *framedSignal){
+    clock_t start, end;
+    double execution_time;
+    start = clock();
     double twoPI = 2.0f * 3.14159265358979323846f;
     double window;
     int frameLength = framedSignal->frameLength;
@@ -68,6 +83,31 @@ void windowingFrames(SignalFrames *framedSignal){
         window = (double) 0.54f - 0.46f * cos(twoPI * ((double) i / (frameLength - 1)));
         for (int n_f = 0; n_f < framedSignal->numberOfFrames; n_f++){
             framedSignal->frames[n_f][i] *= window;
+        }
+    }
+    end = clock();
+    execution_time = ((double)(end - start))/CLOCKS_PER_SEC;
+    printf("It tooks around %lf time to do windowingFrames.\n",execution_time);
+}
+
+//verified
+void rfft(double rbuf[], double ibuf[], double rout[], double iout[], int nFFT, int step){
+    if (step < nFFT){
+        rfft(rout, iout, rbuf, ibuf, nFFT, step * 2);
+        rfft(rout + step, iout + step, rbuf + step, ibuf + step, nFFT, step * 2);
+        double rt, it, cosine, sine;
+        double piconst = 3.14159265358979323846f;
+        double angle;
+        for (int i = 0; i < nFFT; i += 2 * step){
+            angle = piconst * ((double) i / nFFT);
+            cosine = cos(angle);
+            sine = sin(angle);
+            rt = cosine * rout[i + step] + sine * iout[i + step];
+            it = iout[i + step] * cosine - rout[i + step] * sine;
+            rbuf[i / 2] = rout[i] + rt;
+            ibuf[i / 2] = iout[i] + it;
+            rbuf[(i + nFFT) / 2] = rout[i] - rt;
+            ibuf[(i + nFFT) / 2] = iout[i] - it;
         }
     }
 }
@@ -137,59 +177,41 @@ void computeFilterBanks(FilterBanks *fbanks){
     }
 }
 
-//verified, but can be improved computational time aspects
+//verified, commented algorithm is the substitute of fft process, but consume lot of time
 void ApplyDFTSpectrum(SignalFrames *framedSignal, FrameFreqSpectrum *freqSpectrum){
     int nFFT = freqSpectrum->nFFT;
     int n = freqSpectrum->numberOfPositiveFrequency;
-    double twoPI = 2.0f * 3.14159265358979323846f;
-    // for calculating real and imaginary values of FFT functions
-    double **R = (double**) malloc(sizeof(double*) * framedSignal->numberOfFrames);
-    if (!R){
-        printf("Memory could not allocate in ApplyDFTSpectrum function.\n");
+    double *rbuf = (double*) malloc(sizeof(double) * nFFT);
+    double *ibuf = (double*) malloc(sizeof(double) * nFFT);
+    double *rout = (double*) malloc(sizeof(double) * nFFT);
+    double *iout = (double*) malloc(sizeof(double) * nFFT);
+    if ((!rbuf) || (!ibuf) || (!rout) || (!iout)){
+        printf("Could not allocate %d number of double type memory blocks.\n",nFFT);
         exit(1);
     }
-    double **I = (double**) malloc(sizeof(double*) * framedSignal->numberOfFrames);
-    if (!I){
-        printf("Memory could not allocate in ApplyDFTSpectrum function.\n");
-        exit(1);
-    }
+    clock_t start, end;
+    double execution_time;
+    start = clock();
     for (int n_f = 0; n_f < framedSignal->numberOfFrames; n_f++){
-        R[n_f] = (double*) malloc(sizeof(double) * n);
-        I[n_f] = (double*) malloc(sizeof(double) * n);
-        if (!R[n_f] || !I[n_f]){
-            printf("Memory could not allocate in ApplyDFTSpectrum function.\n");
-            exit(1);
+        for (int i = 0; i < nFFT; i++){
+            rbuf[i] = rout[i] = framedSignal->frames[n_f][i];
+            ibuf[i] = iout[i] = 0.0f;
         }
+        rfft(rbuf, ibuf, rout, iout, nFFT, (int) 1);
         for (int k = 0; k < n; k++){
-            *(R[n_f] + k) = (double) 0.0f;
-            *(I[n_f] + k) = (double) 0.0f;
-        }
-    } // memory for real and imaginary values of fft functions are created
-    double theta, angle;
-    for (int k = 0; k < n; k++){
-        theta = (double) twoPI *  ((double) k / nFFT);
-        for (int m = 0; m < nFFT; m++){
-            angle = theta *  (double)  m;
-            for (int n_f = 0; n_f < framedSignal->numberOfFrames; n_f++){
-                *(R[n_f] + k) += ( cos(angle) * framedSignal->frames[n_f][m]);
-                *(I[n_f] + k) -= ( sin(angle) * framedSignal->frames[n_f][m]);
-            }
+            freqSpectrum->framedfrequencySpectrum[n_f][k] = (rbuf[k] * rbuf[k]) + (ibuf[k] * ibuf[k]);
         }
     }
-    for (int n_f = 0; n_f < framedSignal->numberOfFrames; n_f++){
-        for (int k = 0; k < n; k++){
-            freqSpectrum->framedfrequencySpectrum[n_f][k] = ( ( *(R[n_f] + k) *  *(R[n_f] + k)) + ( *(I[n_f] + k) *  *(I[n_f] + k))  ) / (double) nFFT;
-        }
-    }
-    // free memory blocks of R and I 
-    for (int n_f = 0; n_f < framedSignal->numberOfFrames; n_f++){
-        free(R[n_f]);
-        free(I[n_f]);
-    }
-    free(R);
-    free(I);
+    end = clock();
+    execution_time = ((double)(end - start))/CLOCKS_PER_SEC;
+    printf("It tooks around %lf time to do all the rfft.\n",execution_time);
+    free(rbuf);
+    free(ibuf);
+    free(rout);
+    free(iout);
 }
 
+//verified
 void EnergySpectrum(FrameFreqSpectrum *frameFreqSpectrum, FilterBanks *filterBanks, FramedEnergySpectrum *logEnergy){
     long double intRes;
     double smallConst = log((double) 2.220446049250313e-16);
@@ -207,18 +229,9 @@ void EnergySpectrum(FrameFreqSpectrum *frameFreqSpectrum, FilterBanks *filterBan
             }
         }
     }
-    /*
-    for (int n_f = 0; n_f < frameFreqSpectrum->numberOfFrames; n_f++){
-        printf("\n\n");
-        for (int filN = 0; filN < filterBanks->numberOfFilters; filN++){
-            printf("%lf\t",logEnergy->energy[n_f][filN]);
-        }
-        printf("\n");
-    }
-    printf("\n");
-    */
 }
 
+//verified
 void DCTtypeTwo(FramedEnergySpectrum *logEnergy, MFCCFeatures *Features){
     double norm = sqrt(logEnergy->numberOfFilters);
     double intRes;
@@ -244,17 +257,9 @@ void DCTtypeTwo(FramedEnergySpectrum *logEnergy, MFCCFeatures *Features){
             Features->Features[n_f][n_cept] = intRes / norm;
         }
     }
-    /*
-    for (int n_f = 0; n_f < logEnergy->numberOfFrames; n_f++){
-        printf("\n");
-        for (int n_cept = 0; n_cept < Features->numberOfCepstrum; n_cept++){
-            printf("%lf\t",Features->Features[n_f][n_cept]);
-        }
-        printf("\n");
-    }
-    */
 }
 
+//verified
 void Lifter(MFCCFeatures *Features, int lifter){
     if (lifter > 0){
         double normPi = (double) 3.14159265358979323846f / (double) lifter;
@@ -267,17 +272,9 @@ void Lifter(MFCCFeatures *Features, int lifter){
             }
         }
     }
-    /*
-    for (int n_f = 0; n_f < Features->numberOfFrames; n_f++){
-        printf("\n\n");
-        for (int ceptN = 0; ceptN < Features->numberOfCepstrum; ceptN++){
-            printf("%lf\t",Features->Features[n_f][ceptN]);
-        }
-        printf("\n");
-    }
-    */
 }
 
+//verifed
 void computeDeltaFeatures(MFCCFeatures *Features, int K){
     //note this function only works when you have more than 2*K number of frames to comute the delta of MFFC features
     if (Features->numberOfFrames < (2 * K + 1)){
@@ -342,6 +339,7 @@ void computeDeltaFeatures(MFCCFeatures *Features, int K){
     }
 }
 
+
 void cmnvNormFeatures(MFCCFeatures *Features, const double *mean, const double *std, const int dim){
     if ((2 * (Features->numberOfCepstrum))  != dim){
         printf("The number of features are not same as given dim (%d).\n\n", dim);
@@ -355,6 +353,7 @@ void cmnvNormFeatures(MFCCFeatures *Features, const double *mean, const double *
    }
 }
 
+//verified
 void simpleMFCCExtraction(RawAudio *rawAudio, MFCCFeatures *Features){
     if (rawAudio->nFFT == 0){
         rawAudio->nFFT = CalculateNFFt((double) rawAudio->sampleRate, (double) rawAudio->winLen);
@@ -402,15 +401,6 @@ void simpleMFCCExtraction(RawAudio *rawAudio, MFCCFeatures *Features){
 
     findFrames(rawAudio, &framedSignal);
     windowingFrames(&framedSignal);
-    /*
-    for (int i = 0; i < 2; i++){
-        printf("\n");
-        for (int j = 0; j < framedSignal.frameLength; j++){
-            printf("%lf\t",framedSignal.frames[i][j]);
-        }
-        printf("\n");
-    }
-    */
     //upto this point it is computing as expected
     //there is a problem from the next line to the next blue colored texts
 
@@ -425,22 +415,8 @@ void simpleMFCCExtraction(RawAudio *rawAudio, MFCCFeatures *Features){
         //int padLen = ((int) freqSpectrum.nFFT - framedSignal.frameLength);
         padFramedSignal(&framedSignal,((int) freqSpectrum.nFFT - framedSignal.frameLength));
     }
-    /*
-    for (int i = 0; i < 2; i++){
-        printf("\n");
-        for (int j = 0; j < framedSignal.frameLength; j++){
-            printf("%lf\t",framedSignal.frames[i][j]);
-        }
-        printf("\n");
-    }
-    */
 
     ApplyDFTSpectrum(&framedSignal, &freqSpectrum);
-    /*
-    for (int i = 0; i < freqSpectrum.numberOfFrames; i++)
-        printf("%lf\t",freqSpectrum.framedfrequencySpectrum[i][4]);
-    printf("\n");
-    */
     FilterBanks fbanks;
     fbanks.numberOfFilters = rawAudio->nFilt;
     fbanks.numberOfFreq = freqSpectrum.numberOfPositiveFrequency;
@@ -480,6 +456,7 @@ void simpleMFCCExtraction(RawAudio *rawAudio, MFCCFeatures *Features){
 
 }
 
+//verified
 void printMFCC(MFCCFeatures *Features){
     printf("\nPrinting mfcc features that contains %d number of frames with %d number of features.\n",Features->numberOfFrames, Features->numberOfCepstrum);
     for (int nf = 0; nf < Features->numberOfFrames; nf++){
